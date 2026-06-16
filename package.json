@@ -1,0 +1,8 @@
+{
+    "name": "expense-splitter",
+    "private": true,
+    "scripts": {
+        "dev:web": "pnpm --filter web dev",
+        "dev:api": "pnpm --filter api dev"
+    }
+}
