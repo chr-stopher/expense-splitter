@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl= env("DIRECT_URL")
+}
+
+model User {
+  id            String  @id @default(cuid())
+  email         String  @unique
+  name          String
+  passwordHash  String
+  createdAt     DateTime @default(now())
+
+  createdGroups Group[]       @relation("GroupCreator")
+  memberships   Membership[]
+  expensesPaid  Expense[]     @relation("ExpensePayer")
+  splits        ExpenseSplit[]
+}
+
+model Group {
+  id            String    @id @default(cuid())
+  name          String
+  createdById   String
+  createdAt     DateTime  @default(now())
+
+  createdBy     User      @relation("GroupCreator", fields: [createdById], references: [id])
+  memberships   Membership[]
+  expenses      Expense[]
+}
+
+model Membership {
+  id            String    @id @default(cuid())
+  userId        String
+  groupId       String
+  role          String    @default("member")
+  joinedAt      DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id])
+  group         Group     @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+}
+
+model Expense {
+  id            String    @id @default(cuid())
+  groupId       String
+  paidById      String
+  description   String
+  amountCents   Int
+  createdAt     DateTime  @default(now())
+
+  group         Group     @relation(fields: [groupId], references: [id])
+  paidBy        User      @relation("ExpensePayer", fields: [paidById], references: [id])
+  splits ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id            String    @id @default(cuid())
+  expenseId     String
+  userId        String
+  amountCents   Int
+
+  expense       Expense   @relation(fields: [expenseId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+}
