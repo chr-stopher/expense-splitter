@@ -1,14 +1,26 @@
 import express from "express";
-import type { Expense } from "@expense-splitter/shared";
+// import type { Expense } from "@expense-splitter/shared"; Test 1
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+import { prisma } from "./lib/prisma";
+import cookieParser from "cookie-parser";
+import { requireAuth } from "./middleware/auth";
 
 const app = express();
 app.use(express.json());
+// cookie-parser middleware
+app.use(cookieParser());
 
 app.get("/health", (_req, res) => {
     res.json({status: "ok"});
 });
 
-/*Temporary to show the shared type works across packages
+// Middleware route verification
+app.get("/me", requireAuth, (req, res) => {
+    res.json({ user: req.user });
+});
+
+/*Temporary to show the shared type works across packages       Test 1
 app.get("/demo-expense", (_req, res) => {
     const example: Expense = {
         id: "exp_1", // string
@@ -19,6 +31,120 @@ app.get("/demo-expense", (_req, res) => {
     res.json(example);
 });
 */
+
+/* cookie-parser test                                          Test 2
+app.get("/debug-cookies", (req, res) => {
+    res.json(req.cookies);
+});
+*/
+
+// Signup validation
+const signup = z.object({
+    email: z.email(),
+    name: z.string().min(1, "Name is required"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+// Login
+app.post("/auth/signup", async (req, res) => {
+    // 1: Validate body
+    const parsed = signup.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({
+            error: "Invalid input",
+            fieldErrors: z.flattenError(parsed.error).fieldErrors,
+        });
+        return;
+    }
+    const { email, name, password } = parsed.data;
+
+    try {
+        // 2: If user email is in use
+        const exists = await prisma.user.findUnique({ where: { email }});
+        if (exists) {
+            res.status(409).json({ error: "Email already in use"});
+            return;
+        }
+
+        // 3: Hash user password (cost-12)
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        // 4: Create User
+        const user = await prisma.user.create({
+            data: { email, name, passwordHash },
+        });
+
+        // 5: Return safe fields
+        res.status(201).json({ id: user.id, email: user.email, name: user.name });
+    } catch (err) {
+        console.error("Signup error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
+
+// Logout
+app.post("/auth/logout", requireAuth, async (req, res) => {
+    const sessionId = req.cookies.sessionId;
+
+    try {
+        // 1: Delete this session row from the database
+        await prisma.session.delete({ where: { id: sessionId } });
+
+        // 2: Clear the cookie
+        res.clearCookie("sessionId");
+
+        res.json({ message: "Logged out" });
+    } catch (err) {
+        console.error("Logout error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
+
+const loginSchema = z.object({
+    email: z.email(),
+    password: z.string().min(1, "Password is required"),
+});
+
+app.post("/auth/login", async (req, res) => {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({
+            error: "Invalid input",
+            fieldErrors: z.flattenError(parsed.error).fieldErrors,
+        });
+        return;
+    }
+    const { email, password } = parsed.data;
+
+    try {
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        // Generate generic invalid response to email or password
+        if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+            res.status(401).json({ error: "Invalid email or password" });
+            return;
+        }
+
+        // Create 7-day valid session
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+        const session = await prisma.session.create({
+            data: { userId: user.id, expiresAt },
+        });
+
+        // Give browser httpOnly cookie with session id
+        res.cookie("sessionId", session.id, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            expires: expiresAt,
+        });
+
+        res.json({ id: user.id, email: user.email, name: user.name });
+    } catch (err) {
+        console.error("Login error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
 
 const PORT = process.env.PORT ?? 4000;
 app.listen(PORT, () => console.log('API running on :${PORT}'));
