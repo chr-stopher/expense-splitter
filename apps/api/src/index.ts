@@ -146,5 +146,102 @@ app.post("/auth/login", async (req, res) => {
     }
 });
 
+// Create Groups
+const createGroupSchema = z.object({
+    name: z.string().min(1, "Group name is required"),
+});
+
+app.post("/groups", requireAuth, async (req, res) => {
+    const parsed = createGroupSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({
+            error: "Invalid input",
+            fieldErrors: z.flattenError(parsed.error).fieldErrors,
+        });
+        return;
+    }
+    const { name } = parsed.data;
+    const userId = req.user!.id;
+
+    try {
+        // Atomically create group and creator membership together
+        const group = await prisma.$transaction(async (tx) => {
+            const newGroup = await tx.group.create({
+                data: { name, createdById: userId },
+            });
+
+            await tx.membership.create({
+                data: { userId, groupId: newGroup.id, role: "owner" },
+            });
+
+            return newGroup;
+        });
+
+        res.status(201).json(group);
+    } catch (err) {
+        console.error("Create group error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
+
+// Find out what group a user is in
+app.get("/groups", requireAuth, async (req, res) => {
+    const userId = req.user!.id;
+
+    try {
+        const memberships = await prisma.membership.findMany({
+            where: { userId },
+            include: { group: true },
+        });
+
+        // Return the groups themselves, not the membership
+        const groups = memberships.map((m) => m.group);
+        res.json(groups);
+    } catch (err) {
+        console.error("List groups error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
+
+// Join group
+app.post("/groups/:groupId/join", requireAuth, async (req, res) => {
+    const userId = req.user!.id;
+    const { groupId } = req.params;
+
+    // Ensure the type for groupId before being passed to the database
+    if (typeof groupId !== "string") {
+        res.status(400).json({ error: "Invalid group id" });
+        return;
+    }
+
+    try {
+        // Validate group exists
+        const group = await prisma.group.findUnique({ where: { id: groupId } });
+        if (!group) {
+            res.status(404).json({ error: "Group not found" });
+            return;
+        }
+
+        // Don't create duplicate if already a member of a group
+        const existing = await prisma.membership.findUnique({
+            where: { userId_groupId: { userId, groupId } },
+        });
+
+        if (existing) {
+            res.status(409).json({ error: "Already a member of this group" });
+            return;
+        }
+
+        const membership = await prisma.membership.create({
+            data: { userId, groupId, role: "member" },
+        });
+
+        res.status(201).json(membership);
+    } catch (err) {
+        console.error("Join group error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+});
+
 const PORT = process.env.PORT ?? 4000;
 app.listen(PORT, () => console.log('API running on :${PORT}'));
