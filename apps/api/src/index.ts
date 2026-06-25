@@ -243,5 +243,72 @@ app.post("/groups/:groupId/join", requireAuth, async (req, res) => {
     }
 });
 
+import { splitEqually } from "@expense-splitter/shared";
+
+const createExpenseSchema = z.object({
+  description: z.string().min(1, "Description is required"),
+  amountCents: z.number().int().positive("Amount must be a positive number of cents"),
+});
+
+app.post("/groups/:groupId/expenses", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  const parsed = createExpenseSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid input",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+  const { description, amountCents } = parsed.data;
+
+  try {
+    // Authorization: you must be a member of this group to log an expense
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    // Who shares the cost: every current member of the group
+    const members = await prisma.membership.findMany({ where: { groupId } });
+    const shares = splitEqually(amountCents, members.length);
+
+    // Create the expense and all its splits atomically
+    const expense = await prisma.$transaction(async (tx) => {
+      const newExpense = await tx.expense.create({
+        data: { groupId, paidById: userId, description, amountCents },
+      });
+
+      await tx.expenseSplit.createMany({
+        data: members.map((m, i) => ({
+          expenseId: newExpense.id,
+          userId: m.userId,
+          amountCents: shares[i],
+        })),
+      });
+
+      return tx.expense.findUnique({
+        where: { id: newExpense.id },
+        include: { splits: true },
+      });
+    });
+
+    res.status(201).json(expense);
+  } catch (err) {
+    console.error("Create expense error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
 const PORT = process.env.PORT ?? 4000;
 app.listen(PORT, () => console.log('API running on :${PORT}'));
