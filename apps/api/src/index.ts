@@ -243,6 +243,7 @@ app.post("/groups/:groupId/join", requireAuth, async (req, res) => {
     }
 });
 
+// Create expenses
 import { splitEqually } from "@expense-splitter/shared";
 
 const createExpenseSchema = z.object({
@@ -308,6 +309,43 @@ app.post("/groups/:groupId/expenses", requireAuth, async (req, res) => {
     console.error("Create expense error:", err);
     res.status(500).json({ error: "Something went wrong" });
   }
+});
+
+// List expenses
+
+app.get("/groups/:groupId/expenses", requireAuth, async (req, res) => {
+    const userId = req.user!.id;
+    const { groupId } = req.params;
+
+    if (typeof groupId !== "string") {
+        res.status(400).json({ error: "Invalid group id" });
+        return;
+    }
+
+    try {
+        // Auth: only members can view the group expenses
+        const membership = await prisma.membership.findUnique({
+            where: { userId_groupId: { userId, groupId } },
+        });
+        if (!membership) {
+            res.status(403).json({ error: "You are not a member of this group" });
+            return;
+        }
+
+        const expenses = await prisma.expense.findMany({
+            where: { groupId },
+            include: {
+                splits: true,
+                paidBy: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        res.json(expenses);
+    } catch (err) {
+        console.error("List expenses error:", err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
 });
 
 const PORT = process.env.PORT ?? 4000;
