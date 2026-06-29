@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { splitEqually } from "./index";
+import { splitEqually, computeBalances, computeSettlements } from "./index";
+
+
+// Tests for split equally
 
 describe("splitEqually", () => {
     it("splits an evenly divisible amount equally", () => {
@@ -34,4 +37,97 @@ describe("splitEqually", () => {
     it("throws when splitting among zero people", () => {
         expect(() => splitEqually(1000, 0)).toThrow();
     });
+});
+
+// Tests for compute balances
+
+describe("computeBalances", () => {
+  it("computes net balances for a simple two-expense group", () => {
+    const balances = computeBalances([
+      {
+        paidByUserId: "alice",
+        splits: [
+          { userId: "alice", amountCents: 1000 },
+          { userId: "bob", amountCents: 1000 },
+          { userId: "carol", amountCents: 1000 },
+        ],
+      },
+      {
+        paidByUserId: "bob",
+        splits: [
+          { userId: "alice", amountCents: 500 },
+          { userId: "bob", amountCents: 500 },
+          { userId: "carol", amountCents: 500 },
+        ],
+      },
+    ]);
+
+    const byUser = Object.fromEntries(balances.map((b) => [b.userId, b.netCents]));
+    expect(byUser.alice).toBe(1500);
+    expect(byUser.bob).toBe(0);
+    expect(byUser.carol).toBe(-1500);
+  });
+
+  it("always produces balances that sum to zero", () => {
+    const balances = computeBalances([
+      {
+        paidByUserId: "x",
+        splits: [
+          { userId: "x", amountCents: 334 },
+          { userId: "y", amountCents: 333 },
+          { userId: "z", amountCents: 333 },
+        ],
+      },
+    ]);
+    const sum = balances.reduce((acc, b) => acc + b.netCents, 0);
+    expect(sum).toBe(0);
+  });
+
+  it("returns an empty array when there are no expenses", () => {
+    expect(computeBalances([])).toEqual([]);
+  });
+});
+
+// Tests for settlements
+
+describe("computeSettlements", () => {
+  it("settles a simple one-debtor-one-creditor case", () => {
+    const settlements = computeSettlements([
+      { userId: "alice", netCents: 1500 },
+      { userId: "bob", netCents: 0 },
+      { userId: "carol", netCents: -1500 },
+    ]);
+
+    expect(settlements).toEqual([
+      { fromUserId: "carol", toUserId: "alice", amountCents: 1500 },
+    ]);
+  });
+
+  it("fully settles everyone (all balances reach zero)", () => {
+    const balances = [
+      { userId: "a", netCents: 2000 },
+      { userId: "b", netCents: -500 },
+      { userId: "c", netCents: -1500 },
+    ];
+    const settlements = computeSettlements(balances);
+
+    // Apply the settlements back and confirm everyone nets to zero.
+    const final = new Map(balances.map((b) => [b.userId, b.netCents]));
+    for (const s of settlements) {
+      final.set(s.fromUserId, final.get(s.fromUserId)! + s.amountCents);
+      final.set(s.toUserId, final.get(s.toUserId)! - s.amountCents);
+    }
+    for (const net of final.values()) {
+      expect(net).toBe(0);
+    }
+  });
+
+  it("returns no settlements when everyone is already square", () => {
+    expect(
+      computeSettlements([
+        { userId: "a", netCents: 0 },
+        { userId: "b", netCents: 0 },
+      ])
+    ).toEqual([]);
+  });
 });

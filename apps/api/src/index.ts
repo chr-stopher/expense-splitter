@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "./lib/prisma";
 import cookieParser from "cookie-parser";
 import { requireAuth } from "./middleware/auth";
+import { computeBalances, computeSettlements } from "@expense-splitter/shared";
 
 const app = express();
 app.use(express.json());
@@ -346,6 +347,52 @@ app.get("/groups/:groupId/expenses", requireAuth, async (req, res) => {
         console.error("List expenses error:", err);
         res.status(500).json({ error: "Something went wrong" });
     }
+});
+
+// Computing expenses
+
+app.get("/groups/:groupId/balances", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  try {
+    // Authorization: only members can view balances
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    // Load every expense with its splits
+    const expenses = await prisma.expense.findMany({
+      where: { groupId },
+      include: { splits: true },
+    });
+
+    // Shape the DB rows into the inputs our pure functions expect
+    const expenseInputs = expenses.map((e) => ({
+      paidByUserId: e.paidById,
+      splits: e.splits.map((s) => ({
+        userId: s.userId,
+        amountCents: s.amountCents,
+      })),
+    }));
+
+    const balances = computeBalances(expenseInputs);
+    const settlements = computeSettlements(balances);
+
+    res.json({ balances, settlements });
+  } catch (err) {
+    console.error("Compute balances error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
 });
 
 const PORT = process.env.PORT ?? 4000;
