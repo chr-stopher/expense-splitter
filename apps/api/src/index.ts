@@ -6,11 +6,18 @@ import { prisma } from "./lib/prisma";
 import cookieParser from "cookie-parser";
 import { requireAuth } from "./middleware/auth";
 import { computeBalances, computeSettlements } from "@expense-splitter/shared";
+import cors from "cors";
 
 const app = express();
+app.use(
+    cors({
+        origin: "http://localhost:3000",
+        credentials: true,
+    })
+);
 app.use(express.json());
-// cookie-parser middleware
-app.use(cookieParser());
+app.use(cookieParser()); // cookie-parser middleware
+
 
 app.get("/health", (_req, res) => {
     res.json({status: "ok"});
@@ -20,24 +27,6 @@ app.get("/health", (_req, res) => {
 app.get("/me", requireAuth, (req, res) => {
     res.json({ user: req.user });
 });
-
-/*Temporary to show the shared type works across packages       Test 1
-app.get("/demo-expense", (_req, res) => {
-    const example: Expense = {
-        id: "exp_1", // string
-        description: "Dinner",  // string
-        amountCents: 4250, // number
-        paidByUserId: "user_1", // string
-    };
-    res.json(example);
-});
-*/
-
-/* cookie-parser test                                          Test 2
-app.get("/debug-cookies", (req, res) => {
-    res.json(req.cookies);
-});
-*/
 
 // Signup validation
 const signup = z.object({
