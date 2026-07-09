@@ -193,44 +193,83 @@ app.get("/groups", requireAuth, async (req, res) => {
     }
 });
 
-// Join group
-app.post("/groups/:groupId/join", requireAuth, async (req, res) => {
-    const userId = req.user!.id;
-    const { groupId } = req.params;
+// Join group by code (Rather than using cuid link)
+const joinByCodeSchema = z.object({
+  inviteCode: z.string().min(1, "Invite code is required"),
+});
 
-    // Ensure the type for groupId before being passed to the database
-    if (typeof groupId !== "string") {
-        res.status(400).json({ error: "Invalid group id" });
-        return;
+app.post("/groups/join", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+
+  const parsed = joinByCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid input",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+  const { inviteCode } = parsed.data;
+
+  try {
+    // Find the group this code belongs to
+    const group = await prisma.group.findUnique({ where: { inviteCode } });
+    if (!group) {
+      res.status(404).json({ error: "Invalid invite code" });
+      return;
     }
 
-    try {
-        // Validate group exists
-        const group = await prisma.group.findUnique({ where: { id: groupId } });
-        if (!group) {
-            res.status(404).json({ error: "Group not found" });
-            return;
-        }
-
-        // Don't create duplicate if already a member of a group
-        const existing = await prisma.membership.findUnique({
-            where: { userId_groupId: { userId, groupId } },
-        });
-
-        if (existing) {
-            res.status(409).json({ error: "Already a member of this group" });
-            return;
-        }
-
-        const membership = await prisma.membership.create({
-            data: { userId, groupId, role: "member" },
-        });
-
-        res.status(201).json(membership);
-    } catch (err) {
-        console.error("Join group error:", err);
-        res.status(500).json({ error: "Something went wrong" });
+    // Already a member? Don't create a duplicate
+    const existing = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId: group.id } },
+    });
+    if (existing) {
+      res.status(409).json({ error: "You are already a member of this group" });
+      return;
     }
+
+    const membership = await prisma.membership.create({
+      data: { userId, groupId: group.id, role: "member" },
+    });
+
+    res.status(201).json({ membership, group });
+  } catch (err) {
+    console.error("Join by code error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+// Fetch a single group for the invite code to work
+app.get("/groups/:groupId", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  try {
+    // Authorization: only members can view the group
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (!group) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
+
+    res.json(group);
+  } catch (err) {
+    console.error("Get group error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
 });
 
 // Create expenses
@@ -484,6 +523,8 @@ app.post("/groups/:groupId/payments", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Something went wrong" });
   }
 });
+
+
 
 const PORT = process.env.PORT ?? 4000;
 app.listen(PORT, () => console.log('API running on :${PORT}'));
