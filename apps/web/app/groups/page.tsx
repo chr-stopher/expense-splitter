@@ -19,6 +19,8 @@ export default function GroupsPage() {
   const [error, setError] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     api<Group[]>("/groups")
@@ -65,6 +67,25 @@ export default function GroupsPage() {
     }
   }
 
+  async function handleJoinGroup(e: SyntheticEvent) {
+    e.preventDefault();
+    if (!inviteCode.trim()) return;
+    setJoining(true);
+    try {
+      const result = await api<{ group: Group }>("/groups/join", {
+        method: "POST",
+        body: { inviteCode: inviteCode.trim() },
+      });
+      // Add the joined group to the list immediately
+      setGroups((prev) => [...prev, result.group]);
+      setInviteCode("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join group");
+    } finally {
+      setJoining(false);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 600, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -83,6 +104,18 @@ export default function GroupsPage() {
         />
         <button type="submit" disabled={creating} style={{ padding: "8px 16px" }}>
           {creating ? "Creating..." : "Create"}
+        </button>
+      </form>
+      <form onSubmit={handleJoinGroup} style={{ margin: "1rem 0", display: "flex", gap: 8 }}>
+        <input
+          type="text"
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value)}
+          placeholder="Enter invite code"
+          style={{ flex: 1, padding: 8 }}
+        />
+        <button type="submit" disabled={joining} style={{ padding: "8px 16px" }}>
+          {joining ? "Joining..." : "Join"}
         </button>
       </form>
       {groups.length === 0 ? (

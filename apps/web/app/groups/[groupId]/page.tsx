@@ -37,6 +37,8 @@ export default function GroupDetailPage() {
 
   const [members, setMembers] = useState<Member[]>([]);
 
+  const [inviteCode, setInviteCode] = useState("");
+
   const loadData = useCallback(() => {
     Promise.all([
       api<Expense[]>(`/groups/${groupId}/expenses`),
@@ -44,18 +46,13 @@ export default function GroupDetailPage() {
         `/groups/${groupId}/balances`
       ),
       api<Member[]>(`/groups/${groupId}/members`),
+      api<{ inviteCode: string }>(`/groups/${groupId}`),
     ])
-      .then(([expenseData, balanceData, memberData]) => {
+      .then(([expenseData, balanceData, memberData, groupData]) => {
         setExpenses(expenseData);
         setSettlements(balanceData.settlements);
         setMembers(memberData);
-      })
-      .catch((err) => {
-        if (err instanceof Error && err.message.includes("authenticated")) {
-          router.push("/login");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load");
-        }
+        setInviteCode(groupData.inviteCode);
       })
       .finally(() => setLoading(false));
   }, [groupId, router]);
@@ -98,6 +95,17 @@ export default function GroupDetailPage() {
       <button onClick={() => router.push("/groups")} style={{ marginBottom: 16 }}>
         ← Back to groups
       </button>
+      {inviteCode && (
+        <div style={{ margin: "1rem 0", padding: 12, background: "#000000", borderRadius: 4 }}>
+          <strong>Invite code:</strong> {inviteCode}{" "}
+          <button
+            onClick={() => navigator.clipboard.writeText(inviteCode)}
+            style={{ marginLeft: 8, padding: "4px 8px" }}
+          >
+            Copy
+          </button>
+        </div>
+      )}
 
       <h1>Expenses</h1>
       <h2 style={{ marginTop: 24 }}>Members ({members.length})</h2>
