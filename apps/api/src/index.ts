@@ -365,6 +365,8 @@ app.get("/groups/:groupId/balances", requireAuth, async (req, res) => {
       include: { splits: true },
     });
 
+    const payments = await prisma.payment.findMany({ where: { groupId } });
+
     // Shape the DB rows into the inputs our pure functions expect
     const expenseInputs = expenses.map((e) => ({
       paidByUserId: e.paidById,
@@ -374,12 +376,111 @@ app.get("/groups/:groupId/balances", requireAuth, async (req, res) => {
       })),
     }));
 
-    const balances = computeBalances(expenseInputs);
+    // Payment modeled as: payer "paid" the amount, and the recipient "owes" it
+    const paymentInputs = payments.map((p) => ({
+        paidByUserId: p.fromUserId,
+        splits: [{ userId: p.toUserId, amountCents: p.amountCents }],
+    }));
+
+    const balances = computeBalances([...expenseInputs, ...paymentInputs]);
     const settlements = computeSettlements(balances);
 
     res.json({ balances, settlements });
   } catch (err) {
     console.error("Compute balances error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+// List group members in a group
+app.get("/groups/:groupId/members", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  try {
+    // Authorization: only members can view the roster
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    const memberships = await prisma.membership.findMany({
+      where: { groupId },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    // Combine the user's fields with role from memberships
+    const members = memberships.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        role: m.role,
+    }));
+    res.json(members);
+  } catch (err) {
+    console.error("List members error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+// Record a payment
+const createPaymentSchema = z.object({
+  toUserId: z.string().min(1),
+  amountCents: z.number().int().positive(),
+});
+
+app.post("/groups/:groupId/payments", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  const parsed = createPaymentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid input",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+  const { toUserId, amountCents } = parsed.data;
+
+  try {
+    // Authorization: payer must be a member
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    // The recipient must also be a member
+    const recipientMembership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId: toUserId, groupId } },
+    });
+    if (!recipientMembership) {
+      res.status(400).json({ error: "Recipient is not a member of this group" });
+      return;
+    }
+
+    const payment = await prisma.payment.create({
+      data: { groupId, fromUserId: userId, toUserId, amountCents },
+    });
+
+    res.status(201).json(payment);
+  } catch (err) {
+    console.error("Create payment error:", err);
     res.status(500).json({ error: "Something went wrong" });
   }
 });

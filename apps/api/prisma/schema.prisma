@@ -21,11 +21,13 @@ model User {
   passwordHash  String
   createdAt     DateTime @default(now())
 
-  createdGroups Group[]       @relation("GroupCreator")
-  memberships   Membership[]
-  expensesPaid  Expense[]     @relation("ExpensePayer")
-  splits        ExpenseSplit[]
-  sessions      Session[]
+  createdGroups     Group[]       @relation("GroupCreator")
+  memberships       Membership[]
+  expensesPaid      Expense[]     @relation("ExpensePayer")
+  splits            ExpenseSplit[]
+  sessions          Session[]
+  paymentsSent      Payment[]     @relation("PaymentsSent")
+  paymentsReceived  Payment[]     @relation("PaymentsReceived")
 }
 
 model Group {
@@ -37,6 +39,7 @@ model Group {
   createdBy     User      @relation("GroupCreator", fields: [createdById], references: [id])
   memberships   Membership[]
   expenses      Expense[]
+  payments      Payment[]
 }
 
 model Membership {
@@ -84,4 +87,17 @@ model Session {
   createdAt   DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id          String @id @default(cuid())
+  groupId     String
+  fromUserId  String
+  toUserId    String
+  amountCents Int
+  createdAt   DateTime @default(now())
+
+  group       Group   @relation(fields: [groupId], references: [id])
+  fromUser    User    @relation("PaymentsSent", fields: [fromUserId], references: [id])
+  toUser      User    @relation("PaymentsReceived", fields: [toUserId], references: [id])
 }
