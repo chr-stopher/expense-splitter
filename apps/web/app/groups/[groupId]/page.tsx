@@ -41,6 +41,14 @@ export default function GroupDetailPage() {
 
   const [currentUserId, setCurrentUserId] = useState("");
 
+  const [leaveError, setLeaveError] = useState("");
+
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+
+  const [payAmounts, setPayAmounts] = useState<Record<number, string>>({});
+
+  const [notice, setNotice] = useState("");
+
   const loadData = useCallback(() => {
     Promise.all([
       api<Expense[]>(`/groups/${groupId}/expenses`),
@@ -96,23 +104,43 @@ export default function GroupDetailPage() {
       "Are you sure you want to leave this group?"
     );
     if (!confirmed) return;
+    setLeaveError("");
     try {
       await api(`/groups/${groupId}/leave`, { method: "POST" });
       router.push("/groups"); // back to dashboard after leaving
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to leave group");
+      setLeaveError(err instanceof Error ? err.message : "Failed to leave group");
     }
   }
 
-  async function handleSettle(toUserId: string, amountCents: number) {
+  async function handleSettle(
+    toUserId: string,
+    requestedCents: number,
+    owedCents: number
+  ) {
+    if (!Number.isFinite(requestedCents) || requestedCents <= 0) {
+      setNotice("Enter a valid amount.");
+      return;
+    }
+
+    const amountCents = Math.min(requestedCents, owedCents);
+    const wasClamped = requestedCents > owedCents;
+
     try {
       await api(`/groups/${groupId}/payments`, {
         method: "POST",
         body: { toUserId, amountCents },
       });
-      loadData(); // refresh balances so the settled debt clears
+      loadData();
+      if (wasClamped) {
+        setNotice(
+          `Only $${(amountCents / 100).toFixed(2)} was paid to avoid overpaying.`
+        );
+        // Clear the message after 5 seconds
+        setTimeout(() => setNotice(""), 5000);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to settle up");
+      setNotice(err instanceof Error ? err.message : "Failed to settle up");
     }
   }
 
@@ -152,27 +180,45 @@ export default function GroupDetailPage() {
           ))}
         </ul>
       )}
-      <form onSubmit={handleAddExpense} style={{ margin: "1rem 0", display: "flex", gap: 8 }}>
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description"
-          style={{ flex: 2, padding: 8 }}
-        />
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount ($)"
-          style={{ flex: 1, padding: 8 }}
-        />
-        <button type="submit" disabled={submitting} style={{ padding: "8px 16px" }}>
-          {submitting ? "Adding..." : "Add"}
-        </button>
-      </form>
+      {!showExpenseForm ? (
+        <div style={{ textAlign: "center", margin: "1rem 0"}}>
+          <button
+            onClick={() => setShowExpenseForm(true)}
+            style={{ padding: "8px 16px" }}
+          >
+            Add expense
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleAddExpense} style={{ margin: "1rem 0", display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description"
+            style={{ flex: 2, padding: 8 }}
+          />
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Amount ($)"
+            style={{ flex: 1, padding: 8 }}
+          />
+          <button type="submit" disabled={submitting} style={{ padding: "8px 16px" }}>
+            {submitting ? "Adding..." : "Add"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowExpenseForm(false)}
+            style={{ padding: "8px 16px" }}
+          >
+            Hide
+          </button>
+        </form>
+      )}
       {expenses.length === 0 ? (
         <p>No expenses yet.</p>
       ) : (
@@ -187,6 +233,9 @@ export default function GroupDetailPage() {
         </ul>
       )}
       <h2 style={{ marginTop: 32 }}>Balances</h2>
+      {notice && (
+        <p style={{ color: "#888", marginBottom: 8 }}>{notice}</p>
+      )}
       {settlements.length === 0 ? (
         <p>Everyone is settled up.</p>
       ) : (
@@ -196,12 +245,39 @@ export default function GroupDetailPage() {
               {nameFor(s.fromUserId)} owes {nameFor(s.toUserId)}: $
               {(s.amountCents / 100).toFixed(2)}
               {s.fromUserId === currentUserId && (
-                <button
-                  onClick={() => handleSettle(s.toUserId, s.amountCents)}
-                  style={{ marginLeft: 12, padding: "4px 8px" }}
-                >
-                  Settle up
-                </button>
+                <span style={{ marginLeft: 12 }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={(s.amountCents / 100).toFixed(2)}
+                    placeholder="Amount"
+                    value={payAmounts[i] ?? ""}
+                    onChange={(e) =>
+                      setPayAmounts((prev) => ({ ...prev, [i]: e.target.value }))
+                    }
+                    style={{ width: 90, padding: 4, marginRight: 8 }}
+                  />
+                  <button
+                    onClick={() =>
+                      handleSettle(
+                        s.toUserId,
+                        Math.round(parseFloat(payAmounts[i] ?? "0") * 100),
+                        s.amountCents
+                      )
+                    }
+                  >
+                    Pay
+
+                  </button>
+                  <button
+                  onClick={() => handleSettle(s.toUserId, s.amountCents, s.amountCents)}
+                  style={{ padding: "4px 32px"}}
+                  >
+
+                    Pay in full
+                  </button>
+                </span>
               )}
             </li>
           ))}
@@ -214,6 +290,9 @@ export default function GroupDetailPage() {
         >
           Leave group
         </button>
+        {leaveError && (
+          <p style={{ color: "crimson", marginTop: 8 }}>{leaveError}</p>
+        )}
       </div>
     </div>
   );
