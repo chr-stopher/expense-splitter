@@ -51,7 +51,7 @@ model Membership {
   joinedAt      DateTime  @default(now())
 
   user          User      @relation(fields: [userId], references: [id])
-  group         Group     @relation(fields: [groupId], references: [id])
+  group         Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId])
 }
@@ -64,7 +64,7 @@ model Expense {
   amountCents   Int
   createdAt     DateTime  @default(now())
 
-  group         Group     @relation(fields: [groupId], references: [id])
+  group         Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
   paidBy        User      @relation("ExpensePayer", fields: [paidById], references: [id])
   splits ExpenseSplit[]
 }
@@ -75,7 +75,7 @@ model ExpenseSplit {
   userId        String
   amountCents   Int
 
-  expense       Expense   @relation(fields: [expenseId], references: [id])
+  expense       Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id])
 
   @@unique([expenseId, userId])
@@ -98,7 +98,7 @@ model Payment {
   amountCents Int
   createdAt   DateTime @default(now())
 
-  group       Group   @relation(fields: [groupId], references: [id])
+  group       Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   fromUser    User    @relation("PaymentsSent", fields: [fromUserId], references: [id])
   toUser      User    @relation("PaymentsReceived", fields: [toUserId], references: [id])
 }

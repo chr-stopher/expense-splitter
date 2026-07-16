@@ -524,6 +524,79 @@ app.post("/groups/:groupId/payments", requireAuth, async (req, res) => {
   }
 });
 
+// Leaving a group
+app.post("/groups/:groupId/leave", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  try {
+    // Must be a member to leave
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    // Settle-up check: compute this user's net balance in the group
+    const expenses = await prisma.expense.findMany({
+      where: { groupId },
+      include: { splits: true },
+    });
+    const payments = await prisma.payment.findMany({ where: { groupId } });
+
+    const expenseInputs = expenses.map((e) => ({
+      paidByUserId: e.paidById,
+      splits: e.splits.map((s) => ({ userId: s.userId, amountCents: s.amountCents })),
+    }));
+    const paymentInputs = payments.map((p) => ({
+      paidByUserId: p.fromUserId,
+      splits: [{ userId: p.toUserId, amountCents: p.amountCents }],
+    }));
+
+    const balances = computeBalances([...expenseInputs, ...paymentInputs]);
+    const myBalance = balances.find((b) => b.userId === userId)?.netCents ?? 0;
+
+    if (myBalance !== 0) {
+      res.status(400).json({
+        error: "You must settle up before leaving. Your balance is not zero.",
+      });
+      return;
+    }
+
+    // How many members are in the group?
+    const memberCount = await prisma.membership.count({ where: { groupId } });
+
+    if (membership.role === "owner") {
+      if (memberCount > 1) {
+        res.status(400).json({
+          error: "As the owner, you can only leave once all other members have left.",
+        });
+        return;
+      }
+      // Sole owner leaving → disband the group (cascades delete everything)
+      await prisma.group.delete({ where: { id: groupId } });
+      res.json({ message: "Group disbanded" });
+      return;
+    }
+
+    // Regular member leaving → just remove their membership
+    await prisma.membership.delete({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    res.json({ message: "Left group" });
+  } catch (err) {
+    console.error("Leave group error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
 
 
 const PORT = process.env.PORT ?? 4000;

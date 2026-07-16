@@ -39,6 +39,8 @@ export default function GroupDetailPage() {
 
   const [inviteCode, setInviteCode] = useState("");
 
+  const [currentUserId, setCurrentUserId] = useState("");
+
   const loadData = useCallback(() => {
     Promise.all([
       api<Expense[]>(`/groups/${groupId}/expenses`),
@@ -47,12 +49,14 @@ export default function GroupDetailPage() {
       ),
       api<Member[]>(`/groups/${groupId}/members`),
       api<{ inviteCode: string }>(`/groups/${groupId}`),
+      api<{ user: { id: string } }>(`/me`),
     ])
-      .then(([expenseData, balanceData, memberData, groupData]) => {
+      .then(([expenseData, balanceData, memberData, groupData, meData]) => {
         setExpenses(expenseData);
         setSettlements(balanceData.settlements);
         setMembers(memberData);
         setInviteCode(groupData.inviteCode);
+        setCurrentUserId(meData.user.id);
       })
       .finally(() => setLoading(false));
   }, [groupId, router]);
@@ -84,6 +88,31 @@ export default function GroupDetailPage() {
       setError(err instanceof Error ? err.message : "Failed to add expense");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleLeave() {
+    const confirmed = window.confirm(
+      "Are you sure you want to leave this group?"
+    );
+    if (!confirmed) return;
+    try {
+      await api(`/groups/${groupId}/leave`, { method: "POST" });
+      router.push("/groups"); // back to dashboard after leaving
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to leave group");
+    }
+  }
+
+  async function handleSettle(toUserId: string, amountCents: number) {
+    try {
+      await api(`/groups/${groupId}/payments`, {
+        method: "POST",
+        body: { toUserId, amountCents },
+      });
+      loadData(); // refresh balances so the settled debt clears
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to settle up");
     }
   }
 
@@ -166,10 +195,26 @@ export default function GroupDetailPage() {
             <li key={i} style={{ marginBottom: 8 }}>
               {nameFor(s.fromUserId)} owes {nameFor(s.toUserId)}: $
               {(s.amountCents / 100).toFixed(2)}
+              {s.fromUserId === currentUserId && (
+                <button
+                  onClick={() => handleSettle(s.toUserId, s.amountCents)}
+                  style={{ marginLeft: 12, padding: "4px 8px" }}
+                >
+                  Settle up
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
+      <div style={{ textAlign: "center", marginTop: 48 }}>
+        <button
+          onClick={handleLeave}
+          style={{ color: "crimson", padding: "8px 16px" }}
+        >
+          Leave group
+        </button>
+      </div>
     </div>
   );
 }
