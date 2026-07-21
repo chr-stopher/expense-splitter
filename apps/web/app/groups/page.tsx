@@ -93,6 +93,9 @@ export default function GroupsPage() {
         <button onClick={handleLogout} style={{ padding: "8px 16px" }}>
           Log out
         </button>
+        <button onClick={() => router.push("/profile")} style={{ padding: "8px 16px" }}>
+          Profile
+        </button>
       </div>
       <form onSubmit={handleCreateGroup} style={{ margin: "1.5rem 0", display: "flex", gap: 8 }}>
         <input
