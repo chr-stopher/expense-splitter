@@ -26,7 +26,15 @@ type Payment = {
   status: string;
 };
 
-type Member = { id: string; name: string, role: string };
+type Member = {
+  id: string;
+  name: string;
+  role: string;
+  venmoHandle: string | null;
+  cashappTag: string | null;
+  zellePhone: string | null;
+  acceptsCash: boolean;
+};
 
 export default function GroupDetailPage() {
   const router = useRouter();
@@ -165,6 +173,17 @@ export default function GroupDetailPage() {
     }
   }
 
+  const paymentMethodsFor = (userId: string) => {
+    const member = members.find((m) => m.id === userId);
+    if (!member) return [];
+    const methods: string[] = [];
+    if (member.venmoHandle) methods.push(`Venmo: ${member.venmoHandle}`);
+    if (member.cashappTag) methods.push(`CashApp: ${member.cashappTag}`);
+    if (member.zellePhone) methods.push(`Zelle: ${member.zellePhone}`);
+    if (member.acceptsCash) methods.push(`Cash`);
+    return methods;
+  };
+
   const nameFor = (userId:string) =>
     members.find((m) => m.id === userId)?.name ?? "Unknown";
 
@@ -262,43 +281,50 @@ export default function GroupDetailPage() {
       ) : (
         <ul>
           {settlements.map((s, i) => (
-            <li key={i} style={{ marginBottom: 8 }}>
-              {nameFor(s.fromUserId)} owes {nameFor(s.toUserId)}: $
-              {(s.amountCents / 100).toFixed(2)}
-              {s.fromUserId === currentUserId && (
-                <span style={{ marginLeft: 12 }}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={(s.amountCents / 100).toFixed(2)}
-                    placeholder="Amount"
-                    value={payAmounts[i] ?? ""}
-                    onChange={(e) =>
-                      setPayAmounts((prev) => ({ ...prev, [i]: e.target.value }))
-                    }
-                    style={{ width: 90, padding: 4, marginRight: 8 }}
-                  />
-                  <button
-                    onClick={() =>
-                      handleSettle(
-                        s.toUserId,
-                        Math.round(parseFloat(payAmounts[i] ?? "0") * 100),
-                        s.amountCents
-                      )
-                    }
-                  >
-                    Pay
+            <li key={i} style={{ marginBottom: 12 }}>
+              <div>
+                {nameFor(s.fromUserId)} owes {nameFor(s.toUserId)}: $
+                {(s.amountCents / 100).toFixed(2)}
+                {s.fromUserId === currentUserId && (
+                  <span style={{ marginLeft: 12 }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={(s.amountCents / 100).toFixed(2)}
+                      placeholder="Amount"
+                      value={payAmounts[i] ?? ""}
+                      onChange={(e) =>
+                        setPayAmounts((prev) => ({ ...prev, [i]: e.target.value }))
+                      }
+                      style={{ width: 90, padding: 4, marginRight: 8 }}
+                    />
+                    <button
+                      onClick={() =>
+                        handleSettle(
+                          s.toUserId,
+                          Math.round(parseFloat(payAmounts[i] ?? "0") * 100),
+                          s.amountCents
+                        )
+                      }
+                    >
+                      Pay
 
-                  </button>
-                  <button
-                  onClick={() => handleSettle(s.toUserId, s.amountCents, s.amountCents)}
-                  style={{ padding: "4px 32px"}}
-                  >
+                    </button>
+                    <button
+                    onClick={() => handleSettle(s.toUserId, s.amountCents, s.amountCents)}
+                    style={{ padding: "4px 32px"}}
+                    >
 
-                    Pay in full
-                  </button>
-                </span>
+                      Pay in full
+                    </button>
+                  </span>
+                )}
+              </div>
+              {paymentMethodsFor(s.toUserId).length > 0 && (
+                <div style ={{ fontSize: "0.85em", color: "#888", marginTop: 4}}>
+                  Pay via: {paymentMethodsFor(s.toUserId).join(" · ")}
+                </div>
               )}
             </li>
           ))}

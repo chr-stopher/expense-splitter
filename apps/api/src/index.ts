@@ -24,8 +24,26 @@ app.get("/health", (_req, res) => {
 });
 
 // Middleware route verification
-app.get("/me", requireAuth, (req, res) => {
-    res.json({ user: req.user });
+app.get("/me", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        venmoHandle: true,
+        cashappTag: true,
+        zellePhone: true,
+        acceptsCash: true,
+      },
+    });
+    res.json({ user });
+  } catch (err) {
+    console.error("Get me error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
 });
 
 // Signup validation
@@ -453,14 +471,28 @@ app.get("/groups/:groupId/members", requireAuth, async (req, res) => {
 
     const memberships = await prisma.membership.findMany({
       where: { groupId },
-      include: { user: { select: { id: true, name: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            venmoHandle: true,
+            cashappTag: true,
+            zellePhone: true,
+            acceptsCash: true,
+          },
+        },
+      },
     });
 
-    // Combine the user's fields with role from memberships
     const members = memberships.map((m) => ({
-        id: m.user.id,
-        name: m.user.name,
-        role: m.role,
+      id: m.user.id,
+      name: m.user.name,
+      role: m.role,
+      venmoHandle: m.user.venmoHandle,
+      cashappTag: m.user.cashappTag,
+      zellePhone: m.user.zellePhone,
+      acceptsCash: m.user.acceptsCash,
     }));
     res.json(members);
   } catch (err) {
@@ -661,6 +693,46 @@ app.get("/groups/:groupId/payments", requireAuth, async (req, res) => {
     res.json(payments);
   } catch (err) {
     console.error("List payments error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+const updateMeSchema = z.object({
+  venmoHandle: z.string().max(50).optional(),
+  cashappTag: z.string().max(50).optional(),
+  zellePhone: z.string().max(20).optional(),
+  acceptsCash: z.boolean().optional(),
+});
+
+app.patch("/me", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+
+  const parsed = updateMeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid input",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: parsed.data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        venmoHandle: true,
+        cashappTag: true,
+        zellePhone: true,
+        acceptsCash: true,
+      },
+    });
+    res.json(user);
+  } catch (err) {
+    console.error("Update profile error:", err);
     res.status(500).json({ error: "Something went wrong" });
   }
 });

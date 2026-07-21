@@ -21,6 +21,11 @@ model User {
   passwordHash  String
   createdAt     DateTime @default(now())
 
+  venmoHandle   String?
+  cashappTag    String?
+  zellePhone    String?
+  acceptsCash   Boolean @default(false)
+
   createdGroups     Group[]       @relation("GroupCreator")
   memberships       Membership[]
   expensesPaid      Expense[]     @relation("ExpensePayer")
