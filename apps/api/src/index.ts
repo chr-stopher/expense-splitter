@@ -404,7 +404,7 @@ app.get("/groups/:groupId/balances", requireAuth, async (req, res) => {
       include: { splits: true },
     });
 
-    const payments = await prisma.payment.findMany({ where: { groupId } });
+    const payments = await prisma.payment.findMany({ where: { groupId, status: "confirmed" } });
 
     // Shape the DB rows into the inputs our pure functions expect
     const expenseInputs = expenses.map((e) => ({
@@ -593,6 +593,74 @@ app.post("/groups/:groupId/leave", requireAuth, async (req, res) => {
     res.json({ message: "Left group" });
   } catch (err) {
     console.error("Leave group error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+app.post("/payments/:paymentId/confirm", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { paymentId } = req.params;
+
+  if (typeof paymentId !== "string") {
+    res.status(400).json({ error: "Invalid payment id" });
+    return;
+  }
+
+  try {
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) {
+      res.status(404).json({ error: "Payment not found" });
+      return;
+    }
+
+    // Only the recipient can confirm they received the money
+    if (payment.toUserId !== userId) {
+      res.status(403).json({ error: "Only the payment recipient can confirm it" });
+      return;
+    }
+
+    if (payment.status === "confirmed") {
+      res.status(409).json({ error: "Payment is already confirmed" });
+      return;
+    }
+
+    const updated = await prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: "confirmed" },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Confirm payment error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+app.get("/groups/:groupId/payments", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const { groupId } = req.params;
+
+  if (typeof groupId !== "string") {
+    res.status(400).json({ error: "Invalid group id" });
+    return;
+  }
+
+  try {
+    const membership = await prisma.membership.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "You are not a member of this group" });
+      return;
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: { groupId },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(payments);
+  } catch (err) {
+    console.error("List payments error:", err);
     res.status(500).json({ error: "Something went wrong" });
   }
 });

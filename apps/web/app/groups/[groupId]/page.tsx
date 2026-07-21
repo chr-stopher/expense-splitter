@@ -18,6 +18,14 @@ type Expense = {
   paidBy: { id: string; name: string };
 };
 
+type Payment = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  status: string;
+};
+
 type Member = { id: string; name: string, role: string };
 
 export default function GroupDetailPage() {
@@ -49,6 +57,8 @@ export default function GroupDetailPage() {
 
   const [notice, setNotice] = useState("");
 
+  const [payments, setPayments] = useState<Payment[]>([]);
+
   const loadData = useCallback(() => {
     Promise.all([
       api<Expense[]>(`/groups/${groupId}/expenses`),
@@ -58,13 +68,15 @@ export default function GroupDetailPage() {
       api<Member[]>(`/groups/${groupId}/members`),
       api<{ inviteCode: string }>(`/groups/${groupId}`),
       api<{ user: { id: string } }>(`/me`),
+      api<Payment[]>(`/groups/${groupId}/payments`)
     ])
-      .then(([expenseData, balanceData, memberData, groupData, meData]) => {
+      .then(([expenseData, balanceData, memberData, groupData, meData, paymentData]) => {
         setExpenses(expenseData);
         setSettlements(balanceData.settlements);
         setMembers(memberData);
         setInviteCode(groupData.inviteCode);
         setCurrentUserId(meData.user.id);
+        setPayments(paymentData);
       })
       .finally(() => setLoading(false));
   }, [groupId, router]);
@@ -110,6 +122,15 @@ export default function GroupDetailPage() {
       router.push("/groups"); // back to dashboard after leaving
     } catch (err) {
       setLeaveError(err instanceof Error ? err.message : "Failed to leave group");
+    }
+  }
+
+  async function handleConfirmPayment(paymentId: string) {
+    try {
+      await api(`/payments/${paymentId}/confirm`, { method: "POST" });
+      loadData(); // refresh — the confirmed payment now clears the debt
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Failed to confirm payment");
     }
   }
 
@@ -281,6 +302,30 @@ export default function GroupDetailPage() {
               )}
             </li>
           ))}
+        </ul>
+      )}<h2 style={{ marginTop: 32 }}>Pending Payments</h2>
+      {payments.filter((p) => p.status === "pending").length === 0 ? (
+        <p>No pending payments.</p>
+      ) : (
+        <ul>
+          {payments
+            .filter((p) => p.status === "pending")
+            .map((p) => (
+              <li key={p.id} style={{ marginBottom: 8 }}>
+                {nameFor(p.fromUserId)} paid {nameFor(p.toUserId)}: $
+                {(p.amountCents / 100).toFixed(2)}{" "}
+                {p.toUserId === currentUserId ? (
+                  <button
+                    onClick={() => handleConfirmPayment(p.id)}
+                    style={{ marginLeft: 8, padding: "4px 8px" }}
+                  >
+                    Confirm receipt
+                  </button>
+                ) : (
+                  <span style={{ color: "#888" }}>(awaiting confirmation)</span>
+                )}
+              </li>
+            ))}
         </ul>
       )}
       <div style={{ textAlign: "center", marginTop: 48 }}>
