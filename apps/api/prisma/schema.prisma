@@ -96,6 +96,7 @@ model Payment {
   fromUserId  String
   toUserId    String
   amountCents Int
+  status      String @default("pending")
   createdAt   DateTime @default(now())
 
   group       Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
