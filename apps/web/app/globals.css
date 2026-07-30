@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Colors — the named palette everything references */
+  --color-background: #d7f0e4;
+  --color-surface: #eaf7f0;
+  --color-text: #1c332b;
+  --color-text-muted: #5f7a6f;
+  --color-primary: #0f766e;
+  --color-primary-hover: #0c5f58;
+  --color-accent: #e9704b;
+  --color-accent-hover: #d65c39;
+  --color-error: #c0453b;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Fonts — wired to the next/font variables */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Rounded shape language */
+  --radius: 14px;
 }
 
 body {
-  background-color: #000000;
-  color: #e0e0e0;
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body), sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display), sans-serif;
 }

@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import { Button } from "@/Components/Button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,37 +31,48 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Log in</h1>
-      <form onSubmit={handleSubmit}>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ padding: "8px 16px" }}>
-          {loading ? "Logging in..." : "Log in"}
-        </button>
-      </form>
-      <p style={{ marginTop: 16 }}>
-        Need an account? <Link href="/signup">Sign up</Link>
-      </p>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm bg-surface rounded-2xl p-8 shadow-sm">
+        <h1 className="text-3xl mb-1">Welcome back</h1>
+        <p className="text-text-muted mb-6">Log in to see what you owe and who owes you.</p>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          {error && <p className="text-error text-sm">{error}</p>}
+
+          <Button type="submit" variant="accent" disabled={loading}>
+            {loading ? "Logging in..." : "Log in"}
+          </Button>
+        </form>
+
+        <p className="text-sm text-text-muted mt-6 text-center">
+          Need an account?{" "}
+          <Link href="/signup" className="text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

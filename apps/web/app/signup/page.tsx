@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import { Button } from "@/Components/Button";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -37,48 +38,60 @@ export default function SignupPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Sign up</h1>
-      <form onSubmit={handleSubmit}>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Name
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ padding: "8px 16px" }}>
-          {loading ? "Creating account..." : "Sign up"}
-        </button>
-      </form>
-      <p style={{ marginTop: 16 }}>
-        Already have an account? <Link href="/login">Log in</Link>
-      </p>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm bg-surface rounded-2xl p-8 shadow-sm">
+        <h1 className="text-3xl mb-1">Get started</h1>
+        <p className="text-text-muted mb-6">Create an account to start splitting expenses.</p>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">Name</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          {error && <p className="text-error text-sm">{error}</p>}
+
+          <Button type="submit" variant="accent" disabled={loading}>
+            {loading ? "Creating account..." : "Sign up"}
+          </Button>
+        </form>
+
+        <p className="text-sm text-text-muted mt-6 text-center">
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Log in
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
