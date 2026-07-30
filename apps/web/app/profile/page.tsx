@@ -3,6 +3,7 @@
 import { useState, useEffect, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { Button } from "@/Components/Button";
 
 type Profile = {
   id: string;
@@ -60,60 +61,71 @@ export default function ProfilePage() {
   if (loading) return <p style={{ padding: "2rem" }}>Loading...</p>;
 
   return (
-    <div style={{ maxWidth: 400, margin: "2rem auto", padding: "0 1rem" }}>
-      <button onClick={() => router.push("/groups")} style={{ marginBottom: 16 }}>
+    <div className="max-w-md mx-auto px-4 py-8">
+      <button
+        onClick={() => router.push("/groups")}
+        className="text-text-muted hover:text-text transition-colors mb-6"
+      >
         ← Back to groups
       </button>
-      <h1>Payment Methods</h1>
-      <p style={{ color: "#888" }}>
-        Set how you'd like to be paid. Others in your groups will see these when
-        they owe you.
-      </p>
-      <form onSubmit={handleSave}>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Venmo handle
-          <input
-            type="text"
-            value={venmoHandle}
-            onChange={(e) => setVenmoHandle(e.target.value)}
-            placeholder="@your-venmo"
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          CashApp tag
-          <input
-            type="text"
-            value={cashappTag}
-            onChange={(e) => setCashappTag(e.target.value)}
-            placeholder="$your-cashtag"
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 12 }}>
-          Zelle phone
-          <input
-            type="text"
-            value={zellePhone}
-            onChange={(e) => setZellePhone(e.target.value)}
-            placeholder="555-123-4567"
-            style={{ display: "block", width: "100%", padding: 8, marginTop: 4 }}
-          />
-        </label>
-        <label style={{ display: "block", marginBottom: 16 }}>
-          <input
-            type="checkbox"
-            checked={acceptsCash}
-            onChange={(e) => setAcceptsCash(e.target.checked)}
-            style={{ marginRight: 8 }}
-          />
-          Accept cash
-        </label>
-        <button type="submit" disabled={saving} style={{ padding: "8px 16px" }}>
-          {saving ? "Saving..." : "Save"}
-        </button>
-        {message && <p style={{ marginTop: 12, color: "#888" }}>{message}</p>}
-      </form>
+
+      <div className="bg-surface rounded-2xl p-8">
+        <h1 className="text-3xl mb-1">Payment methods</h1>
+        <p className="text-text-muted mb-6">
+          Set how you'd like to be paid. People who owe you will see these when they settle up.
+        </p>
+
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">💸 Venmo handle</span>
+            <input
+              type="text"
+              value={venmoHandle}
+              onChange={(e) => setVenmoHandle(e.target.value)}
+              placeholder="@your-venmo"
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">💵 CashApp tag</span>
+            <input
+              type="text"
+              value={cashappTag}
+              onChange={(e) => setCashappTag(e.target.value)}
+              placeholder="$your-cashtag"
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-text-muted">🏦 Zelle phone</span>
+            <input
+              type="text"
+              value={zellePhone}
+              onChange={(e) => setZellePhone(e.target.value)}
+              placeholder="555-123-4567"
+              className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+          </label>
+
+          <label className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox"
+              checked={acceptsCash}
+              onChange={(e) => setAcceptsCash(e.target.checked)}
+              className="w-4 h-4 accent-primary"
+            />
+            <span>💰 Accept cash</span>
+          </label>
+
+          <Button type="submit" variant="accent" disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
+
+          {message && <p className="text-text-muted text-sm">{message}</p>}
+        </form>
+      </div>
     </div>
   );
 }

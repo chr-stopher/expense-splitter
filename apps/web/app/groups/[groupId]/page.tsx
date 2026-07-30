@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type SyntheticEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { api } from "@/lib/api";
+import { Button } from "@/Components/Button";
 
 type Balance = { userId: string; netCents: number };
 type Settlement = { fromUserId: string; toUserId: string; amountCents: number };
@@ -176,11 +177,11 @@ export default function GroupDetailPage() {
   const paymentMethodsFor = (userId: string) => {
     const member = members.find((m) => m.id === userId);
     if (!member) return [];
-    const methods: string[] = [];
-    if (member.venmoHandle) methods.push(`Venmo: ${member.venmoHandle}`);
-    if (member.cashappTag) methods.push(`CashApp: ${member.cashappTag}`);
-    if (member.zellePhone) methods.push(`Zelle: ${member.zellePhone}`);
-    if (member.acceptsCash) methods.push(`Cash`);
+    const methods: { icon: string; label: string }[] = [];
+    if (member.venmoHandle) methods.push({ icon: "💸", label: `Venmo ${member.venmoHandle}` });
+    if (member.cashappTag) methods.push({ icon: "💵", label: `CashApp ${member.cashappTag}` });
+    if (member.zellePhone) methods.push({ icon: "🏦", label: `Zelle ${member.zellePhone}` });
+    if (member.acceptsCash) methods.push({ icon: "💰", label: "Cash" });
     return methods;
   };
 
@@ -188,105 +189,134 @@ export default function GroupDetailPage() {
     members.find((m) => m.id === userId)?.name ?? "Unknown";
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", padding: "0 1rem" }}>
-      <button onClick={() => router.push("/groups")} style={{ marginBottom: 16 }}>
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <button
+        onClick={() => router.push("/groups")}
+        className="text-text-muted hover:text-text transition-colors mb-6"
+      >
         ← Back to groups
       </button>
+
       {inviteCode && (
-        <div style={{ margin: "1rem 0", padding: 12, background: "#000000", borderRadius: 4 }}>
-          <strong>Invite code:</strong> {inviteCode}{" "}
-          <button
-            onClick={() => navigator.clipboard.writeText(inviteCode)}
-            style={{ marginLeft: 8, padding: "4px 8px" }}
-          >
+        <div className="bg-surface rounded-2xl p-4 mb-6 flex items-center justify-between gap-3">
+          <div>
+            <span className="text-sm text-text-muted">Invite code</span>
+            <p className="font-mono text-lg">{inviteCode}</p>
+          </div>
+          <Button variant="ghost" onClick={() => navigator.clipboard.writeText(inviteCode)}>
             Copy
-          </button>
+          </Button>
         </div>
       )}
 
-      <h1>Expenses</h1>
-      <h2 style={{ marginTop: 24 }}>Members ({members.length})</h2>
-      {members.length === 0 ? (
-        <p>No members yet.</p>
-      ) : (
-        <ul>
-          {members.map((member) => (
-            <li key={member.id} style={{ marginBottom: 4 }}>
-              {member.name}
-              {member.role === "owner" && (
-                <span style={{ color: "#666", marginLeft: 6 }}>(owner)</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {!showExpenseForm ? (
-        <div style={{ textAlign: "center", margin: "1rem 0"}}>
-          <button
-            onClick={() => setShowExpenseForm(true)}
-            style={{ padding: "8px 16px" }}
-          >
-            Add expense
-          </button>
+      <div className="bg-surface rounded-2xl p-5 mb-6">
+        <h2 className="text-lg mb-3">Members ({members.length})</h2>
+        {members.length === 0 ? (
+          <p className="text-text-muted">No members yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {members.map((member) => (
+              <li key={member.id} className="flex items-center gap-2">
+                <span>{member.name}</span>
+                {member.role === "owner" && (
+                  <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                    owner
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="bg-surface rounded-2xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg">Expenses</h2>
+          {!showExpenseForm && (
+            <Button variant="accent" onClick={() => setShowExpenseForm(true)}>
+              Add expense
+            </Button>
+          )}
         </div>
-      ) : (
-        <form onSubmit={handleAddExpense} style={{ margin: "1rem 0", display: "flex", gap: 8 }}>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description"
-            style={{ flex: 2, padding: 8 }}
-          />
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Amount ($)"
-            style={{ flex: 1, padding: 8 }}
-          />
-          <button type="submit" disabled={submitting} style={{ padding: "8px 16px" }}>
-            {submitting ? "Adding..." : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowExpenseForm(false)}
-            style={{ padding: "8px 16px" }}
-          >
-            Hide
-          </button>
-        </form>
-      )}
-      {expenses.length === 0 ? (
-        <p>No expenses yet.</p>
-      ) : (
-        <ul>
-          {expenses.map((expense) => (
-            <li key={expense.id} style={{ marginBottom: 8 }}>
-              <strong>{expense.description}</strong> —{" "}
-              ${(expense.amountCents / 100).toFixed(2)}{" "}
-              <span style={{ color: "#666" }}>paid by {expense.paidBy.name}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <h2 style={{ marginTop: 32 }}>Balances</h2>
-      {notice && (
-        <p style={{ color: "#888", marginBottom: 8 }}>{notice}</p>
-      )}
-      {settlements.length === 0 ? (
-        <p>Everyone is settled up.</p>
-      ) : (
-        <ul>
-          {settlements.map((s, i) => (
-            <li key={i} style={{ marginBottom: 12 }}>
-              <div>
-                {nameFor(s.fromUserId)} owes {nameFor(s.toUserId)}: $
-                {(s.amountCents / 100).toFixed(2)}
+
+        {showExpenseForm && (
+          <form onSubmit={handleAddExpense} className="flex flex-col sm:flex-row gap-2 mb-4">
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description"
+              className="flex-1 rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Amount ($)"
+              className="sm:w-32 rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+            />
+            <Button type="submit" variant="primary" disabled={submitting}>
+              {submitting ? "Adding..." : "Add"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setShowExpenseForm(false)}>
+              Cancel
+            </Button>
+          </form>
+        )}
+
+        {expenses.length === 0 ? (
+          <p className="text-text-muted">No expenses yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {expenses.map((expense) => (
+              <li key={expense.id} className="flex justify-between items-center py-2 border-b border-primary/10 last:border-0">
+                <span className="font-medium">{expense.description}</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-text-muted text-sm">paid by {expense.paidBy.name}</span>
+                  <span className="font-semibold">${(expense.amountCents / 100).toFixed(2)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+
+      <div className="bg-surface rounded-2xl p-5 mb-6">
+        <h2 className="text-lg mb-3">Balances</h2>
+        {notice && <p className="text-text-muted text-sm mb-3">{notice}</p>}
+
+        {settlements.length === 0 ? (
+          <p className="text-text-muted">Everyone is settled up. 🎉</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {settlements.map((s, i) => (
+              <li key={i} className="bg-background rounded-xl p-4">
+                <div className="flex justify-between items-center">
+                  <span>
+                    <span className="font-medium">{nameFor(s.fromUserId)}</span>
+                    <span className="text-text-muted"> owes </span>
+                    <span className="font-medium">{nameFor(s.toUserId)}</span>
+                  </span>
+                  <span className="font-semibold text-accent">
+                    ${(s.amountCents / 100).toFixed(2)}
+                  </span>
+                </div>
+
+                {paymentMethodsFor(s.toUserId).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {paymentMethodsFor(s.toUserId).map((m, j) => (
+                      <span key={j} className="text-xs bg-surface rounded-full px-2 py-1">
+                        {m.icon} {m.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {s.fromUserId === currentUserId && (
-                  <span style={{ marginLeft: 12 }}>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
                     <input
                       type="number"
                       step="0.01"
@@ -297,9 +327,10 @@ export default function GroupDetailPage() {
                       onChange={(e) =>
                         setPayAmounts((prev) => ({ ...prev, [i]: e.target.value }))
                       }
-                      style={{ width: 90, padding: 4, marginRight: 8 }}
+                      className="w-28 rounded-full px-3 py-1.5 bg-surface border border-primary/20 outline-none focus:border-primary text-sm"
                     />
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() =>
                         handleSettle(
                           s.toUserId,
@@ -309,61 +340,56 @@ export default function GroupDetailPage() {
                       }
                     >
                       Pay
-
-                    </button>
-                    <button
-                    onClick={() => handleSettle(s.toUserId, s.amountCents, s.amountCents)}
-                    style={{ padding: "4px 32px"}}
+                    </Button>
+                    <Button
+                      variant="accent"
+                      onClick={() => handleSettle(s.toUserId, s.amountCents, s.amountCents)}
                     >
-
                       Pay in full
-                    </button>
-                  </span>
-                )}
-              </div>
-              {paymentMethodsFor(s.toUserId).length > 0 && (
-                <div style ={{ fontSize: "0.85em", color: "#888", marginTop: 4}}>
-                  Pay via: {paymentMethodsFor(s.toUserId).join(" · ")}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}<h2 style={{ marginTop: 32 }}>Pending Payments</h2>
-      {payments.filter((p) => p.status === "pending").length === 0 ? (
-        <p>No pending payments.</p>
-      ) : (
-        <ul>
-          {payments
-            .filter((p) => p.status === "pending")
-            .map((p) => (
-              <li key={p.id} style={{ marginBottom: 8 }}>
-                {nameFor(p.fromUserId)} paid {nameFor(p.toUserId)}: $
-                {(p.amountCents / 100).toFixed(2)}{" "}
-                {p.toUserId === currentUserId ? (
-                  <button
-                    onClick={() => handleConfirmPayment(p.id)}
-                    style={{ marginLeft: 8, padding: "4px 8px" }}
-                  >
-                    Confirm receipt
-                  </button>
-                ) : (
-                  <span style={{ color: "#888" }}>(awaiting confirmation)</span>
+                    </Button>
+                  </div>
                 )}
               </li>
             ))}
-        </ul>
-      )}
-      <div style={{ textAlign: "center", marginTop: 48 }}>
+          </ul>
+        )}
+      </div>
+
+      <div className="bg-surface rounded-2xl p-5 mb-6">
+        <h2 className="text-lg mb-3">Pending payments</h2>
+        {payments.filter((p) => p.status === "pending").length === 0 ? (
+          <p className="text-text-muted">No pending payments.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {payments
+              .filter((p) => p.status === "pending")
+              .map((p) => (
+                <li key={p.id} className="flex justify-between items-center py-2 border-b border-primary/10 last:border-0">
+                  <span>
+                    {nameFor(p.fromUserId)} paid {nameFor(p.toUserId)}:{" "}
+                    <span className="font-semibold">${(p.amountCents / 100).toFixed(2)}</span>
+                  </span>
+                  {p.toUserId === currentUserId ? (
+                    <Button variant="primary" onClick={() => handleConfirmPayment(p.id)}>
+                      Confirm receipt
+                    </Button>
+                  ) : (
+                    <span className="text-text-muted text-sm">awaiting confirmation</span>
+                  )}
+                </li>
+              ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="text-center mt-8">
         <button
           onClick={handleLeave}
-          style={{ color: "crimson", padding: "8px 16px" }}
+          className="text-error hover:underline transition-colors"
         >
           Leave group
         </button>
-        {leaveError && (
-          <p style={{ color: "crimson", marginTop: 8 }}>{leaveError}</p>
-        )}
+        {leaveError && <p className="text-error text-sm mt-2">{leaveError}</p>}
       </div>
     </div>
   );

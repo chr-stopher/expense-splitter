@@ -4,6 +4,7 @@ import { useState, useEffect, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import { Button } from "@/Components/Button";
 
 type Group = {
   id: string;
@@ -87,47 +88,72 @@ export default function GroupsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", padding: "0 1rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Your Groups</h1>
-        <button onClick={handleLogout} style={{ padding: "8px 16px" }}>
-          Log out
-        </button>
-        <button onClick={() => router.push("/profile")} style={{ padding: "8px 16px" }}>
-          Profile
-        </button>
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Header row */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl">Your Groups</h1>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => router.push("/profile")}>
+            Profile
+          </Button>
+          <Button variant="ghost" onClick={handleLogout}>
+            Log out
+          </Button>
+        </div>
       </div>
-      <form onSubmit={handleCreateGroup} style={{ margin: "1.5rem 0", display: "flex", gap: 8 }}>
-        <input
-          type="text"
-          value={newGroupName}
-          onChange={(e) => setNewGroupName(e.target.value)}
-          placeholder="New group name"
-          style={{ flex: 1, padding: 8 }}
-        />
-        <button type="submit" disabled={creating} style={{ padding: "8px 16px" }}>
-          {creating ? "Creating..." : "Create"}
-        </button>
-      </form>
-      <form onSubmit={handleJoinGroup} style={{ margin: "1rem 0", display: "flex", gap: 8 }}>
-        <input
-          type="text"
-          value={inviteCode}
-          onChange={(e) => setInviteCode(e.target.value)}
-          placeholder="Enter invite code"
-          style={{ flex: 1, padding: 8 }}
-        />
-        <button type="submit" disabled={joining} style={{ padding: "8px 16px" }}>
-          {joining ? "Joining..." : "Join"}
-        </button>
-      </form>
+
+      {/* Create + join forms, side by side in cards */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-8">
+        <form
+          onSubmit={handleCreateGroup}
+          className="bg-surface rounded-2xl p-5 flex flex-col gap-3"
+        >
+          <h2 className="text-lg">Create a group</h2>
+          <input
+            type="text"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            placeholder="Group name"
+            className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+          />
+          <Button type="submit" variant="accent" disabled={creating}>
+            {creating ? "Creating..." : "Create group"}
+          </Button>
+        </form>
+
+        <form
+          onSubmit={handleJoinGroup}
+          className="bg-surface rounded-2xl p-5 flex flex-col gap-3"
+        >
+          <h2 className="text-lg">Join a group</h2>
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            placeholder="Invite code"
+            className="rounded-full px-4 py-2 bg-background border border-primary/20 outline-none focus:border-primary"
+          />
+          <Button type="submit" variant="accent" disabled={joining}>
+            {joining ? "Joining..." : "Join group"}
+          </Button>
+        </form>
+      </div>
+
+      {error && <p className="text-error mb-4">{error}</p>}
+
+      {/* Group list as cards */}
       {groups.length === 0 ? (
-        <p>You are not in any groups yet.</p>
+        <p className="text-text-muted">You are not in any groups yet. Create one or join with an invite code.</p>
       ) : (
-        <ul>
+        <ul className="flex flex-col gap-3">
           {groups.map((group) => (
-            <li key={group.id} style={{ marginBottom: 8 }}>
-              <Link href={`/groups/${group.id}`}>{group.name}</Link>
+            <li key={group.id}>
+              <Link
+                href={`/groups/${group.id}`}
+                className="block bg-surface rounded-2xl p-5 hover:shadow-md transition-shadow"
+              >
+                <span className="text-lg">{group.name}</span>
+              </Link>
             </li>
           ))}
         </ul>
